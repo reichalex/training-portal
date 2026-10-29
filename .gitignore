@@ -1,0 +1,13 @@
+bin/
+obj/
+*.user
+.vs/
+.vscode/
+.idea/
+node_modules/
+dist/
+.angular/
+api/TrainingPortal.Api/storage/
+api/TrainingPortal.Api/wwwroot/
+appsettings.Local.json
+TestResults/
