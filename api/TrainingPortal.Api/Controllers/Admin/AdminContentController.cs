@@ -57,8 +57,9 @@ public class AdminContentController(PortalDbContext db, IFileStorage storage, IO
             return BadRequest(new { message = "Module not found." });
         if (item.Type != req.Type && await db.ContentProgress.AnyAsync(p => p.ContentItemId == id))
             return Conflict(new { message = "People have already viewed this item, so it cannot change between video and article." });
-        Apply(item, req);
+        var replacedFile = Apply(item, req);
         await db.SaveChangesAsync();
+        if (replacedFile is not null) await storage.DeleteAsync(replacedFile);
         return await Get(id);
     }
 
@@ -120,8 +121,10 @@ public class AdminContentController(PortalDbContext db, IFileStorage storage, IO
         return new UploadResult($"/api/media/{key}");
     }
 
-    private static void Apply(ContentItem item, ContentSaveRequest req)
+    /// <summary>Copies the request onto the item; returns the key of an uploaded file it no longer uses.</summary>
+    private static string? Apply(ContentItem item, ContentSaveRequest req)
     {
+        string? unusedFile = null;
         item.ModuleId = req.ModuleId;
         item.Title = req.Title.Trim();
         item.Summary = string.IsNullOrWhiteSpace(req.Summary) ? null : req.Summary.Trim();
@@ -134,6 +137,9 @@ public class AdminContentController(PortalDbContext db, IFileStorage storage, IO
             item.ArticleBody = null;
             if (!string.IsNullOrWhiteSpace(req.ExternalVideoUrl))
             {
+                unusedFile = item.VideoFileKey;
+                item.VideoFileKey = item.VideoFileName = item.VideoContentType = null;
+                item.VideoSizeBytes = null;
                 item.ExternalVideoUrl = req.ExternalVideoUrl.Trim();
                 item.DurationSeconds = req.DurationSeconds ?? item.DurationSeconds;
             }
@@ -150,6 +156,7 @@ public class AdminContentController(PortalDbContext db, IFileStorage storage, IO
             item.DurationSeconds = null;
         }
         item.UpdatedAt = DateTime.UtcNow;
+        return unusedFile;
     }
 
     private async Task<List<AdminContentDto>> ToDtos(ModuleCatalog catalog, List<ContentItem> items)

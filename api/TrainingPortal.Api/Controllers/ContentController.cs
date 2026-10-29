@@ -42,7 +42,7 @@ public class ContentController(PortalDbContext db, ProgressService progress, Med
             courseContext = new CourseContext(cid, course.Title, index + 1, sequence.Count,
                 index > 0 ? sequence[index - 1] : null,
                 index < sequence.Count - 1 ? sequence[index + 1] : null,
-                enrollment.CompletedAt is not null);
+                course.EnforceOrder, enrollment.CompletedAt is not null);
         }
         else if (!isAdmin && !await Summaries.IsVisibleAsync(db, catalog, item))
         {

@@ -37,7 +37,7 @@ public record ProgressDto(int LastPositionSeconds, int MaxPositionSeconds, int S
 }
 
 public record CourseContext(int CourseId, string CourseTitle, int Position, int Total,
-    int? PreviousContentId, int? NextContentId, bool CourseCompleted);
+    int? PreviousContentId, int? NextContentId, bool EnforceOrder, bool CourseCompleted);
 
 public record ContentDetail(int Id, int ModuleId, List<Crumb> Breadcrumb, string Title, string? Summary,
     ContentType Type, string? VideoUrl, int? DurationSeconds, string? ArticleBody, int? EstimatedMinutes,
