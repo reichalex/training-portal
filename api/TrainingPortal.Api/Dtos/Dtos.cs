@@ -6,13 +6,19 @@ namespace TrainingPortal.Api.Dtos;
 // ---- Auth / users ----
 
 public record UserDto(int Id, string Email, string DisplayName, string? Department, UserRole Role, bool IsActive,
-    DateTime CreatedAt, DateTime? LastLoginAt)
+    DateTime CreatedAt, DateTime? LastLoginAt, bool HasPassword, bool SignsInWithMicrosoft)
 {
     public static UserDto From(User u) =>
-        new(u.Id, u.Email, u.DisplayName, u.Department, u.Role, u.IsActive, u.CreatedAt, u.LastLoginAt);
+        new(u.Id, u.Email, u.DisplayName, u.Department, u.Role, u.IsActive, u.CreatedAt, u.LastLoginAt,
+            !string.IsNullOrEmpty(u.PasswordHash), u.ExternalId is not null);
 }
 
 public record LoginRequest([Required, EmailAddress] string Email, [Required] string Password);
+public record EntraLoginRequest([Required] string AccessToken);
+
+/// <summary>Which sign-in methods the login page should offer.</summary>
+public record AuthConfig(bool LocalLogin, EntraClientConfig? Entra);
+public record EntraClientConfig(string ClientId, string Authority, string Scope);
 public record LoginResponse(string Token, DateTime ExpiresAt, UserDto User);
 public record ChangePasswordRequest([Required] string CurrentPassword, [Required, MinLength(8)] string NewPassword);
 

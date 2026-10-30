@@ -15,7 +15,7 @@ using TrainingPortal.Api.Dtos;
 namespace TrainingPortal.Api.Tests;
 
 /// <summary>Runs the real API in memory against SQLite instead of SQL Server.</summary>
-public sealed class PortalFactory : WebApplicationFactory<Program>
+public class PortalFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _conn = new("DataSource=:memory:");
     public string StoragePath { get; } = Path.Combine(Path.GetTempPath(), "portal-tests-" + Guid.NewGuid().ToString("N"));
@@ -35,6 +35,12 @@ public sealed class PortalFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<PortalDbContext>>();
             services.AddDbContext<PortalDbContext>(o => o.UseSqlite(_conn));
         });
+        Customize(builder);
+    }
+
+    /// <summary>Extra settings and services for a test class that needs them.</summary>
+    protected virtual void Customize(IWebHostBuilder builder)
+    {
     }
 
     protected override void Dispose(bool disposing)
@@ -45,7 +51,7 @@ public sealed class PortalFactory : WebApplicationFactory<Program>
     }
 }
 
-file static class ServiceCollectionExtensions
+internal static class ServiceCollectionExtensions
 {
     public static void RemoveAll<T>(this IServiceCollection services)
     {

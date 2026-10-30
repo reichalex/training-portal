@@ -5,7 +5,10 @@ namespace TrainingPortal.Api.Data;
 
 public class SeedOptions
 {
-    /// <summary>First admin account, created only when the Users table is empty.</summary>
+    /// <summary>
+    /// First admin account, created only when the Users table is empty. Leave the password
+    /// empty when the admin will sign in with Microsoft.
+    /// </summary>
     public string? AdminEmail { get; set; }
     public string? AdminPassword { get; set; }
     public string AdminName { get; set; } = "Portal Administrator";
@@ -15,13 +18,16 @@ public class SeedOptions
 
 public static class DbSeeder
 {
-    public static async Task SeedAsync(PortalDbContext db, SeedOptions opt, IPasswordHasher<User> hasher, ILogger logger)
+    public static async Task SeedAsync(PortalDbContext db, SeedOptions opt, IPasswordHasher<User> hasher,
+        bool microsoftSignIn, ILogger logger)
     {
         if (!await db.Users.AnyAsync())
         {
-            if (string.IsNullOrWhiteSpace(opt.AdminEmail) || string.IsNullOrWhiteSpace(opt.AdminPassword))
+            var hasPassword = !string.IsNullOrWhiteSpace(opt.AdminPassword);
+            if (string.IsNullOrWhiteSpace(opt.AdminEmail) || (!hasPassword && !microsoftSignIn))
             {
-                logger.LogWarning("No users exist. Set Seed:AdminEmail and Seed:AdminPassword to create the first admin.");
+                logger.LogWarning("No users exist. Set Seed:AdminEmail (and Seed:AdminPassword, unless people sign in " +
+                                  "with Microsoft) to create the first admin.");
             }
             else
             {
@@ -31,7 +37,8 @@ public static class DbSeeder
                     DisplayName = opt.AdminName,
                     Role = UserRole.Admin,
                 };
-                admin.PasswordHash = hasher.HashPassword(admin, opt.AdminPassword);
+                // Without a password the admin signs in with Microsoft; the account is linked by email.
+                if (hasPassword) admin.PasswordHash = hasher.HashPassword(admin, opt.AdminPassword!);
                 db.Users.Add(admin);
                 await db.SaveChangesAsync();
                 logger.LogInformation("Created admin account {Email}.", admin.Email);

@@ -22,45 +22,53 @@ import { LearnerApi } from '../core/api';
         }
         <dt>Role</dt>
         <dd>{{ auth.user()?.role }}</dd>
+        <dt>Signs in with</dt>
+        <dd>
+          {{ auth.user()?.signsInWithMicrosoft ? 'Microsoft account' : '' }}
+          {{ auth.user()?.signsInWithMicrosoft && auth.user()?.hasPassword ? ' and ' : '' }}
+          {{ auth.user()?.hasPassword ? 'Portal password' : '' }}
+        </dd>
       </dl>
     </div>
-    <form class="card narrow" (ngSubmit)="change()" #f="ngForm">
-      <h2>Change password</h2>
-      <label
-        >Current password
-        <input
-          type="password"
-          name="current"
-          [(ngModel)]="current"
-          required
-          autocomplete="current-password"
-      /></label>
-      <label
-        >New password
-        <input
-          type="password"
-          name="next"
-          [(ngModel)]="next"
-          required
-          minlength="8"
-          autocomplete="new-password"
-      /></label>
-      <label
-        >Repeat new password
-        <input
-          type="password"
-          name="repeat"
-          [(ngModel)]="repeat"
-          required
-          autocomplete="new-password"
-      /></label>
-      @if (message()) {
-        <p [class.error]="isError()" [class.success-text]="!isError()">{{ message() }}</p>
-      }
-      <button class="btn primary" type="submit" [disabled]="f.invalid || busy()">
-        Change password
-      </button>
-    </form>
+    @if (auth.user()?.hasPassword) {
+      <form class="card narrow" (ngSubmit)="change()" #f="ngForm">
+        <h2>Change password</h2>
+        <label
+          >Current password
+          <input
+            type="password"
+            name="current"
+            [(ngModel)]="current"
+            required
+            autocomplete="current-password"
+        /></label>
+        <label
+          >New password
+          <input
+            type="password"
+            name="next"
+            [(ngModel)]="next"
+            required
+            minlength="8"
+            autocomplete="new-password"
+        /></label>
+        <label
+          >Repeat new password
+          <input
+            type="password"
+            name="repeat"
+            [(ngModel)]="repeat"
+            required
+            autocomplete="new-password"
+        /></label>
+        @if (message()) {
+          <p [class.error]="isError()" [class.success-text]="!isError()">{{ message() }}</p>
+        }
+        <button class="btn primary" type="submit" [disabled]="f.invalid || busy()">
+          Change password
+        </button>
+      </form>
+    }
   `,
 })
 export class Account {
@@ -72,6 +80,11 @@ export class Account {
   protected readonly busy = signal(false);
   protected readonly message = signal('');
   protected readonly isError = signal(false);
+
+  constructor() {
+    // Picks up sign-in details that may have changed since this session started.
+    this.auth.refresh().catch(() => undefined);
+  }
 
   async change(): Promise<void> {
     if (this.next !== this.repeat) {

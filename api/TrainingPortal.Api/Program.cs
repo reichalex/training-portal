@@ -14,6 +14,8 @@ builder.Services.Configure<JwtOptions>(config.GetSection("Jwt"));
 builder.Services.Configure<StorageOptions>(config.GetSection("Storage"));
 builder.Services.Configure<ProgressOptions>(config.GetSection("Progress"));
 builder.Services.Configure<SeedOptions>(config.GetSection("Seed"));
+builder.Services.Configure<AuthOptions>(config.GetSection("Auth"));
+builder.Services.Configure<EntraOptions>(config.GetSection("Entra"));
 
 builder.Services.AddDbContext<PortalDbContext>(o =>
     o.UseSqlServer(config.GetConnectionString("Portal")
@@ -32,6 +34,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ClockSkew = TimeSpan.FromMinutes(1),
     });
 builder.Services.AddAuthorization();
+
+var entra = config.GetSection("Entra").Get<EntraOptions>() ?? new EntraOptions();
+var localLogin = config.GetSection("Auth").Get<AuthOptions>()?.LocalLogin ?? true;
+if (entra.Enabled && entra.TenantId!.Trim().ToLowerInvariant() is "common" or "organizations" or "consumers")
+    throw new InvalidOperationException("Entra:TenantId must be your organisation's tenant ID, not a multi-tenant alias.");
+if (!entra.Enabled && !localLogin)
+    throw new InvalidOperationException("Auth:LocalLogin is off and Entra is not configured, so nobody could sign in.");
+builder.Services.AddSingleton<IEntraTokenValidator>(sp => new EntraTokenValidator(
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EntraOptions>>(),
+    EntraTokenValidator.MetadataFor(entra),
+    sp.GetRequiredService<ILogger<EntraTokenValidator>>()));
 
 // Keys that sign video tickets; kept on disk so links survive a restart. On a web farm,
 // point this at a shared folder (or use PersistKeysToAzureBlobStorage etc.).
@@ -61,7 +74,7 @@ using (var scope = app.Services.CreateScope())
     if (db.Database.IsSqlServer()) await db.Database.MigrateAsync();
     else await db.Database.EnsureCreatedAsync();
     await DbSeeder.SeedAsync(db, config.GetSection("Seed").Get<SeedOptions>() ?? new SeedOptions(),
-        scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>(), app.Logger);
+        scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>(), entra.Enabled, app.Logger);
 }
 
 app.UseExceptionHandler();

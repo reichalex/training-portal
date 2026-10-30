@@ -282,3 +282,37 @@ GO
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261030030013_AddUserExternalId'
+)
+BEGIN
+    ALTER TABLE [Users] ADD [ExternalId] nvarchar(100) NULL;
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261030030013_AddUserExternalId'
+)
+BEGIN
+    EXEC(N'CREATE UNIQUE INDEX [IX_Users_ExternalId] ON [Users] ([ExternalId]) WHERE [ExternalId] IS NOT NULL');
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT * FROM [__EFMigrationsHistory]
+    WHERE [MigrationId] = N'20261030030013_AddUserExternalId'
+)
+BEGIN
+    INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+    VALUES (N'20261030030013_AddUserExternalId', N'8.0.11');
+END;
+GO
+
+COMMIT;
+GO
+

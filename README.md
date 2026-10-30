@@ -32,6 +32,7 @@ watched or read what.
 - **Courses:** build a course from existing content, reorder its steps, and choose whether order is
   enforced. Assign it to people with a due date, and see each learner's progress.
 - **Users:** add people, set admin or learner roles, reset passwords, and deactivate accounts.
+  With Microsoft sign-in on, people can sign in with their company account (see below).
 - **Reports:** for every person, items started and completed, courses done and overdue, minutes
   watched, and last activity. Drill into one person's full training record, or into one video to
   see who watched it and how far. **Export to CSV** (opens in Excel) for all viewing and all course progress.
@@ -104,7 +105,10 @@ or Azure App Service settings.
 | `Storage:MaxVideoBytes` | 4 GB | Largest video upload. |
 | `Progress:CompletionThreshold` | 0.9 | Share of a video that must be watched. |
 | `Progress:MaxPlaybackRate` | 2.0 | Fastest playback speed credited. |
-| `Seed:AdminEmail` / `Seed:AdminPassword` | (empty) | Creates the first admin when the Users table is empty. Remove after first start. |
+| `Entra:TenantId` / `Entra:ClientId` | (empty) | Turn on **Sign in with Microsoft**. See [Signing in with Microsoft](#signing-in-with-microsoft-entra-id). |
+| `Entra:AutoProvision` | true | Create a learner account for anyone in the tenant on first sign-in. When false, an admin must add people first. |
+| `Auth:LocalLogin` | true | Allow email and password sign-in. |
+| `Seed:AdminEmail` / `Seed:AdminPassword` | (empty) | Creates the first admin when the Users table is empty. Leave the password empty if the admin signs in with Microsoft. |
 | `Seed:SampleContent` | false | Adds the example Power BI and Genie modules to an empty database. |
 | `DataProtection:KeyPath` | `storage/keys` | Keys that sign video links. On more than one server, point this at a shared folder. |
 
@@ -144,18 +148,50 @@ write to `Storage:RootPath`. The included `web.config` raises IIS's 30 MB upload
 For larger libraries, store videos in Azure Blob Storage: implement `IFileStorage`
 (`Services/FileStorage.cs`) and register it in `Program.cs` in place of `LocalFileStorage`.
 
-## Single sign-on
+## Signing in with Microsoft (Entra ID)
 
-The portal ships with its own email and password sign-in so it works anywhere. To sign in with
-company accounts (Microsoft Entra ID / Azure AD):
+People can sign in with their company Microsoft account. The browser signs in with Microsoft
+(MSAL), and the API checks the Microsoft token (signature, your tenant, this app, a user rather
+than an app) and swaps it for a portal session.
 
-1. Register the app in Entra ID.
-2. In `Program.cs`, replace the JWT validation with `AddMicrosoftIdentityWebApi`
-   (package `Microsoft.Identity.Web`).
-3. On first sign-in, create or match the `Users` row by email (`AuthController`).
-4. In Angular, replace `AuthService.login` with MSAL (`@azure/msal-angular`).
+- **First sign-in:** the person is matched to a portal account by email, so accounts an admin
+  added beforehand keep their role. Anyone else from your tenant gets a new **learner** account,
+  unless `Entra:AutoProvision` is `false`, in which case only people an admin has added can get in.
+- **Admins** are still chosen on the **Users** page. A person's role doesn't come from Entra.
+- **Deactivating** someone on the Users page stops them signing in, even with a working Microsoft
+  account. A session that is already open runs until it expires (`Jwt:LifetimeHours`).
+- **Password sign-in** stays available alongside it (useful for a break-glass admin). Turn it off
+  with `Auth:LocalLogin: false`.
 
-Roles, progress tracking and reports are unchanged.
+### One-time setup in the Azure portal
+
+1. **Microsoft Entra ID → App registrations → New registration.** Name it "Training Portal" and
+   choose *Accounts in this organizational directory only*.
+2. Under **Redirect URI**, choose platform **Single-page application (SPA)** and enter
+   `https://<your portal>/login`. For development, also add `http://localhost:4200/login`.
+3. **Expose an API:** set the Application ID URI (accept the default `api://<client id>`), then
+   **Add a scope** named `access_as_user` (*Admins and users* can consent; it's enabled).
+4. Optional: **Manifest:** set `api.requestedAccessTokenVersion` to `2` (older manifests call it
+   `accessTokenAcceptedVersion`). Both v1 and v2 tokens are accepted.
+5. Optional: under **Enterprise applications → Training Portal → Properties**, set
+   *Assignment required* to Yes to choose exactly which people or groups can sign in.
+6. Copy the **Directory (tenant) ID** and **Application (client) ID** from the Overview page.
+
+Then configure the API (in `appsettings.Production.json` or as environment variables such as
+`Entra__TenantId`):
+
+```json
+"Entra": {
+  "TenantId": "<directory (tenant) id>",
+  "ClientId": "<application (client) id>"
+},
+"Auth": { "LocalLogin": true },
+"Seed": { "AdminEmail": "you@yourcompany.com", "AdminPassword": "" }
+```
+
+With `Seed:AdminPassword` left empty on a new database, the first admin has no password. Their
+account is linked the first time they sign in with Microsoft using that email. There is no client
+secret: the SPA uses PKCE, and the API only checks token signatures against Microsoft's public keys.
 
 ## Tests
 
@@ -164,7 +200,8 @@ dotnet test
 ```
 
 These cover the watch-tracking rules (skipping ahead, inflated play time, completion threshold,
-learned duration), course sequencing and completion, sign-in and admin-only access, hidden
+learned duration), course sequencing and completion, sign-in and admin-only access, Microsoft
+token validation (wrong tenant, wrong app, expired, forged, app-only) and account linking, hidden
 content, video upload and ticketed range streaming, reports and CSV export, and module-tree cycle
 protection. The HTTP tests run the real API in memory against SQLite. Production uses SQL Server.
 

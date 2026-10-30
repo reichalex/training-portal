@@ -12,6 +12,13 @@ export interface User {
   isActive: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  hasPassword: boolean;
+  signsInWithMicrosoft: boolean;
+}
+
+export interface AuthConfig {
+  localLogin: boolean;
+  entra: { clientId: string; authority: string; scope: string } | null;
 }
 
 export interface LoginResponse {

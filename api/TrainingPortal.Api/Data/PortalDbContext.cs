@@ -21,6 +21,8 @@ public class PortalDbContext(DbContextOptions<PortalDbContext> options) : DbCont
             e.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
             e.Property(x => x.Department).HasMaxLength(200);
             e.Property(x => x.PasswordHash).HasMaxLength(500);
+            e.Property(x => x.ExternalId).HasMaxLength(100);
+            e.HasIndex(x => x.ExternalId).IsUnique();
         });
 
         b.Entity<TrainingModule>(e =>

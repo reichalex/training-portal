@@ -3,7 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AdminApi } from '../core/api';
-import { errorMessage } from '../core/auth';
+import { AuthService, errorMessage } from '../core/auth';
 import { User, UserSave } from '../core/models';
 
 @Component({
@@ -44,10 +44,16 @@ import { User, UserSave } from '../core/models';
               type="password"
               name="password"
               [(ngModel)]="f.password"
-              [required]="!editingId()"
+              [required]="!editingId() && !microsoft()"
               minlength="8"
               autocomplete="new-password"
             />
+            @if (microsoft() && !editingId()) {
+              <span class="hint"
+                >Leave blank for people who sign in with Microsoft. Their account is linked by email
+                the first time they do.</span
+              >
+            }
           </label>
           <label class="check"
             ><input type="checkbox" name="active" [(ngModel)]="f.isActive" /> Active (can sign
@@ -78,6 +84,7 @@ import { User, UserSave } from '../core/models';
             <th>Email</th>
             <th>Department</th>
             <th>Role</th>
+            <th>Sign-in</th>
             <th>Last sign-in</th>
             <th></th>
           </tr>
@@ -98,6 +105,14 @@ import { User, UserSave } from '../core/models';
                   Learner
                 }
               </td>
+              <td class="small">
+                {{ u.signsInWithMicrosoft ? 'Microsoft' : ''
+                }}{{ u.signsInWithMicrosoft && u.hasPassword ? ', ' : ''
+                }}{{ u.hasPassword ? 'Password' : '' }}
+                @if (!u.signsInWithMicrosoft && !u.hasPassword) {
+                  <span class="muted">Not linked yet</span>
+                }
+              </td>
               <td class="small muted">
                 {{ u.lastLoginAt ? (u.lastLoginAt | date: 'medium') : 'Never' }}
               </td>
@@ -114,6 +129,9 @@ import { User, UserSave } from '../core/models';
 })
 export class UsersAdmin {
   private readonly api = inject(AdminApi);
+  private readonly auth = inject(AuthService);
+  /** Microsoft sign-in is on, so new users don't need a portal password. */
+  protected readonly microsoft = signal(false);
   protected readonly users = signal<User[]>([]);
   protected readonly form = signal<UserSave | null>(null);
   protected readonly editingId = signal<number | null>(null);
@@ -129,6 +147,10 @@ export class UsersAdmin {
 
   constructor() {
     this.load();
+    this.auth.config().then(
+      (c) => this.microsoft.set(!!c.entra),
+      () => undefined,
+    );
   }
 
   protected startNew(): void {

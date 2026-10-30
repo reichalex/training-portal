@@ -18,7 +18,10 @@ public class User
     public string Email { get; set; } = "";
     public string DisplayName { get; set; } = "";
     public string? Department { get; set; }
+    /// <summary>Empty for people who only sign in with Microsoft.</summary>
     public string PasswordHash { get; set; } = "";
+    /// <summary>Microsoft Entra ID object id (oid), set the first time the person signs in with Microsoft.</summary>
+    public string? ExternalId { get; set; }
     public UserRole Role { get; set; } = UserRole.Learner;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
